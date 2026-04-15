@@ -1,0 +1,8 @@
+{
+  "title": "Stratify Production Overview",
+  "panels": [
+    {"type": "timeseries", "title": "HTTP Requests", "targets": [{"expr": "stratify_http_requests_total"}]},
+    {"type": "timeseries", "title": "Ingestion Failures", "targets": [{"expr": "stratify_jobs_failed_total"}]},
+    {"type": "timeseries", "title": "Drift Breaches", "targets": [{"expr": "stratify_drift_breaches_total"}]}
+  ]
+}

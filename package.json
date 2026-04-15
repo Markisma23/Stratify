@@ -1,0 +1,24 @@
+{
+  "name": "stratify",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:api dev:web",
+    "dev:api": "npm --workspace @stratify/api run dev",
+    "dev:web": "npm --workspace @stratify/web run dev",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces && npm --workspace @stratify/api run test:integration && npm --workspace @stratify/api run test:security && npm --workspace @stratify/api run test:e2e",
+    "security:sbom": "echo \"syft . -o cyclonedx-json > sbom.json\"",
+    "security:scan": "echo \"npm audit --production && trivy fs .\"",
+    "test:load": "echo \"k6 run apps/api/src/tests/load/k6.js\"",
+    "release:rollback": "npm --workspace @stratify/api run dev -- --rollback"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  }
+}

@@ -1,0 +1,13 @@
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package.json ./
+COPY apps/web/package.json apps/web/package.json
+RUN npm install
+
+FROM deps AS build
+COPY . .
+RUN npm run build --workspace @stratify/web
+
+FROM nginx:1.27-alpine
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+EXPOSE 80
