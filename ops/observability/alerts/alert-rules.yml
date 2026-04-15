@@ -1,0 +1,17 @@
+groups:
+  - name: stratify-slo
+    rules:
+      - alert: StratifyHighErrorRate
+        expr: rate(stratify_http_requests_total[5m]) > 0 and rate(stratify_http_requests_total[5m]) < 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Potential request drop/high error"
+      - alert: DriftBreachDetected
+        expr: stratify_drift_breaches_total > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Model drift breach detected"

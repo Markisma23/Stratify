@@ -1,0 +1,98 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=stratify
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - stratify_pg_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ..
+      dockerfile: ops/docker/api.Dockerfile
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - JWT_SECRET=change-me-before-prod
+      - CORS_ORIGIN=http://localhost:5173
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/stratify
+      - DB_SSL=false
+      - OIDC_ISSUER=https://issuer.example.com
+      - OIDC_AUDIENCE=stratify-api
+      - OIDC_JWKS_URI=https://issuer.example.com/.well-known/jwks.json
+      - SAML_ISSUER=stratify-idp
+      - SAML_AUDIENCE=stratify-sp
+      - SAML_METADATA_URL=https://issuer.example.com/metadata
+      - SAML_METADATA_TTL_MS=3600000
+      - SAML_CLOCK_SKEW_MS=120000
+      - ML_SERVICE_URL=http://ml-service:9000
+      - ML_SERVICE_TOKEN=dev-token
+      - ARTIFACT_STORE_PATH=/tmp/stratify-artifacts
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - postgres
+
+  ingestion-worker:
+    build:
+      context: ..
+      dockerfile: ops/docker/api.Dockerfile
+    command: ["npm", "--workspace", "@stratify/api", "run", "jobs:ingestion"]
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/stratify
+      - DB_SSL=false
+      - JWT_SECRET=change-me-before-prod
+      - ML_SERVICE_URL=http://ml-service:9000
+      - ML_SERVICE_TOKEN=dev-token
+      - ARTIFACT_STORE_PATH=/tmp/stratify-artifacts
+    depends_on:
+      - postgres
+
+  outbox-worker:
+    build:
+      context: ..
+      dockerfile: ops/docker/api.Dockerfile
+    command: ["npm", "--workspace", "@stratify/api", "run", "jobs:outbox"]
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/stratify
+      - DB_SSL=false
+      - JWT_SECRET=change-me-before-prod
+    depends_on:
+      - postgres
+
+  ml-service:
+    image: python:3.12-slim
+    command: ["python", "-m", "http.server", "9000"]
+    ports:
+      - "9000:9000"
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.104.0
+    command: ["--set=service.telemetry.logs.level=info"]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  web:
+    build:
+      context: ..
+      dockerfile: ops/docker/web.Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  stratify_pg_data:

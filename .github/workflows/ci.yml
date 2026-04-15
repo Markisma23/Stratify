@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run lint
+      - run: npm run test
+      - run: npm --workspace @stratify/api run test:integration
+      - run: npm --workspace @stratify/api run test:security
+      - run: npm run build
+
+  load-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - run: k6 run apps/api/src/tests/load/k6.js
+
+  security-sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: returntocorp/semgrep-action@v1
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3
+
+  security-supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          output-file: sbom.spdx.json
+      - uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: '1'
+
+  deploy-canary:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: [quality-gates, security-sast, security-supply-chain]
+    steps:
+      - run: echo "Deploy canary rollout"
+      - run: echo "If health checks fail, call rollback plan endpoint"
